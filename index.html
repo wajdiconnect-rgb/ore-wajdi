@@ -95,9 +95,9 @@ input{font:inherit;font-size:17px;color:var(--ink);background:var(--paper);borde
 <label>Inizio<input type="time" id="s" value="08:00" required></label>
 <label>Fine<input type="time" id="e" value="17:00" required></label>
 <div class="sec">Pausa</div>
-<div class="seg" id="pt"><button type="button" data-v="no">Nessuna</button><button type="button" data-v="pag">Pagata</button><button type="button" data-v="non">Mia (non pagata)</button><button type="button" data-v="both">Pagata + mia</button></div>
+<div class="seg" id="pt"><button type="button" data-v="no">Nessuna</button><button type="button" data-v="pag">Pagata</button><button type="button" data-v="non">Non pagata</button><button type="button" data-v="both">Pagata + non pagata</button></div>
 <label id="pmw">Pausa pagata (min)<input type="number" id="pm" value="30" min="0" step="5" inputmode="numeric"></label>
-<label id="puw">Pausa mia (min)<input type="number" id="pu" value="30" min="0" step="5" inputmode="numeric"></label>
+<label id="puw">Pausa non pagata (min)<input type="number" id="pu" value="30" min="0" step="5" inputmode="numeric"></label>
 <div class="prev" id="pv"></div>
 <div class="sec">Pranzo</div>
 <label>Spesa (€)<input type="number" id="x" min="0" step="0.01" placeholder="0,00" inputmode="decimal"></label>
@@ -134,7 +134,8 @@ function guessPause(r,note){
 function today(){return new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)}
 /* Mese mostrato: all'apertura sempre il mese in corso */
 var SEL=today().slice(0,7),CHECK=[];
-try{if(!localStorage.getItem("sc3_pz1")){[BASE,extra].forEach(function(L){L.forEach(function(r){var g=guessPause(r,notes[r[0]]);if(g){r[5]=g[0];r[6]=g[1];r[10]=g[2];if(g[3])CHECK.push(r[0])}})});localStorage.setItem("sc3_pz1","1");sv()}}catch(e){}
+try{if(!localStorage.getItem("sc3_pz1")){[BASE,extra].forEach(function(L){L.forEach(function(r){var g=guessPause(r,notes[r[0]]);if(g){r[5]=g[0];r[6]=g[1];r[10]=g[2];if(g[3])CHECK.push(r[0])}})});localStorage.setItem("sc3_pz1","1");sv()}
+ if(!localStorage.getItem("sc3_nt1")){[BASE,extra].forEach(function(L){L.forEach(function(r){if(notes[r[0]])notes[r[0]]=stdNote(r,notes[r[0]])})});localStorage.setItem("sc3_nt1","1");sv()}}catch(e){}
 function shiftM(k){var y=+SEL.slice(0,4),m=+SEL.slice(5)-1+k;y+=Math.floor(m/12);m=((m%12)+12)%12;SEL=y+"-"+("0"+(m+1)).slice(-2)}
 var GG=["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","sabato"],MM=["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 function $(i){return document.getElementById(i)}
@@ -147,7 +148,11 @@ function sg(w){return w===5?7:(w===0||w===6)?0:8}
 function sv(){try{localStorage.setItem("sc3_extra",JSON.stringify(extra));localStorage.setItem("sc3_notes",JSON.stringify(notes));localStorage.setItem("sc3_data",JSON.stringify(BASE));localStorage.setItem("sc3_conf",JSON.stringify(CONF))}catch(e){}}
 function times(r){return r[3]?[r[3],r[4]]:(TM[r[0]]||["",""])}
 function fmin(m){if(!m)return"";if(m<60)return m+" min";var h=Math.floor(m/60),x=m%60;return h+" h"+(x?" "+x:"")}
-function ptxt(r,short){var t=r[5],m=fmin(r[6]);if(t==="no")return"nessuna";if(t==="pag")return(m?m+" ":"")+(short?"pag.":"pagata");if(t==="non")return(m?m+" ":"")+(short?"mia":"mia, non pagata");if(t==="both")return fmin(r[6])+(short?" pag. + ":" pagata + ")+fmin(r[10])+" mia";return"-"}
+function fminL(m){m=+m||0;if(m<60)return m+" minuti";var h=Math.floor(m/60),x=m%60;return(h===1?"1 ora":h+" ore")+(x?" e "+x:"")}
+function ptxt(r){var t=r[5];if(t==="no")return"nessuna";if(t==="pag")return fminL(r[6])+" pagata";if(t==="non")return fminL(r[6])+" non pagata";if(t==="both")return fminL(r[6])+" pagata + "+fminL(r[10])+" non pagata";return"-"}
+/* Nota standard per la pausa, al posto di "la mia pausa" ecc. */
+function stdNote(r,old){if(!old||!r[5]||!/pausa|mezz|pagat|\bmia\b|lamia|\bmn\b/i.test(old))return old;var a=/\ba ([A-Z\u00C0-\u00DC][a-z\u00E0-\u00FC]+)/.exec(old);
+ return(r[5]==="no"?"Senza pausa":"Pausa: "+ptxt(r))+(a?" (a "+a[1]+")":"")}
 /* Paid/unpaid minutes of a row */
 function pmin(r){return r[5]==="pag"?[r[6],0]:r[5]==="non"?[0,r[6]]:r[5]==="both"?[r[6],r[10]]:[0,0]}
 function info(o){var r=o.r,d=new Date(r[0]+"T12:00:00"),w=d.getDay(),ot=r[9]?r[1]:Math.max(0,r2(r[1]-sg(w)));return{d:d,w:w,ot:ot}}
@@ -167,11 +172,11 @@ function render(){
  $("days").innerHTML=h||"<li class='empty'>Nessuna giornata in "+MM[+SEL.slice(5)-1]+". Tocca <b>Aggiungi</b> per segnare la prima.</li>";
  $("days").querySelectorAll(".nt").forEach(function(n){n.value=notes[n.getAttribute("data-k")]||"";fit(n)});
  var dc=T.DIFF>0.004?["up","+"+nf(T.DIFF)+" ore sopra le "+nf(CONF.ore)+" del contratto"]:T.DIFF<-0.004?["down",nf(-T.DIFF)+" ore sotto le "+nf(CONF.ore)+" del contratto"]:["eq","Esattamente le "+nf(CONF.ore)+" ore del contratto"];
- $("sum").innerHTML="<div class='t'><b>"+all.length+"</b><span>giornate</span></div><div class='t'><b>"+nf(T.H)+"</b><span>ore lavorate</span><small>"+nf(T.SV)+" orario totale − "+nf(r2(T.mu/60))+" pausa non pagata</small></div>"
+ $("sum").innerHTML="<div class='t'><b>"+all.length+"</b><span>giornate</span></div><div class='t'><b>"+nf(T.H)+"</b><span>ore lavorate</span><small>"+nf(T.SV)+" dall'entrata all'uscita − "+nf(r2(T.mu/60))+" pausa non pagata</small></div>"
   +"<div class='t'><b>"+nf(T.ORD)+"</b><span>ore ordinarie</span></div><div class='t o'><b>"+nf(T.O)+"</b><span>ore di straordinario</span><small>+"+nf(CONF.magg)+"% = "+nf(T.OM)+" ore</small></div>"
-  +"<div class='cmp'><div class='big'><b>"+nf(T.TOT)+"</b><span>ore totali con maggiorazione</span></div><div class='calc'>"+nf(T.SV)+" orario totale − "+nf(r2(T.mu/60))+" pausa non pagata = "+nf(T.H)+" ore lavorate<br>"+nf(T.ORD)+" ordinarie + "+nf(T.O)+" straordinario × "+nf(1+CONF.magg/100)+" ("+nf(T.OM)+")</div><span class='res "+dc[0]+"'>"+dc[1]+"</span>"
+  +"<div class='cmp'><div class='big'><b>"+nf(T.TOT)+"</b><span>ore totali con maggiorazione</span></div><div class='calc'>"+nf(T.SV)+" dall'entrata all'uscita − "+nf(r2(T.mu/60))+" pausa non pagata = "+nf(T.H)+" ore lavorate<br>"+nf(T.ORD)+" ordinarie + "+nf(T.O)+" straordinario × "+nf(1+CONF.magg/100)+" ("+nf(T.OM)+")</div><span class='res "+dc[0]+"'>"+dc[1]+"</span>"
   +"<div class='set'><label>Ore contratto/mese<input type='number' id='cfo' min='1' step='0.5' inputmode='decimal' value='"+CONF.ore+"'></label><label>Maggiorazione %<input type='number' id='cfm' min='0' step='1' inputmode='numeric' value='"+CONF.magg+"'></label></div></div>"
-  +"<div class='t'><b>"+(fmin(T.mu)||"0")+"</b><span>pausa mia, non pagata</span><small>totale del mese, già tolta dalle ore<br>pausa pagata: "+(fmin(T.mp)||"0")+" · senza pausa: "+T.no+(T.nd?" · da segnare: "+T.nd:"")+"</small></div>"
+  +"<div class='t'><b>"+(fmin(T.mu)||"0")+"</b><span>pausa non pagata</span><small>totale del mese, già tolta dalle ore<br>pausa pagata: "+(fmin(T.mp)||"0")+" · senza pausa: "+T.no+(T.nd?" · da segnare: "+T.nd:"")+"</small></div>"
   +"<div class='t'><b>"+eur(T.S)+"</b><span>pranzi</span><small>da rimborsare: "+eur(T.SR)+"</small></div>";
  $("mese").textContent=MM[+SEL.slice(5)-1]+" "+SEL.slice(0,4)}
 $("mp").addEventListener("click",function(){shiftM(-1);render()});
@@ -185,7 +190,7 @@ function setPT(v){PT=v;$("pt").querySelectorAll("button").forEach(function(b){b.
 function mins(){var a=$("s").value.split(":"),b=$("e").value.split(":");if(a.length<2||b.length<2)return 0;var m=(+b[0]*60+ +b[1])-(+a[0]*60+ +a[1]);return m<0?m+1440:m}
 function calcH(){var m=mins(),p=(PT==="non"||PT==="both")?(+$("pu").value||0):0;return Math.max(0,r2((m-p)/60))}
 function prev(){var h=calcH(),t="Ore lavorate: <b>"+nf(h)+"</b>";
- if(PT==="pag")t+=" · la pausa pagata resta dentro le ore";else if(PT==="non"||PT==="both")t+=" · tolti "+(fmin(+$("pu").value||0)||"0 min")+" di pausa mia"+(PT==="both"?", la pagata resta dentro":"");
+ if(PT==="pag")t+=" · la pausa pagata resta dentro le ore";else if(PT==="non"||PT==="both")t+=" · tolti "+(fmin(+$("pu").value||0)||"0 min")+" di pausa non pagata"+(PT==="both"?", la pagata resta dentro":"");
  if(ED&&Math.abs(ED.r[1]-h)>0.004)t+="<br>Prima erano segnate "+nf(ED.r[1])+" ore";$("pv").innerHTML=t}
 $("pt").addEventListener("click",function(e){var v=e.target.getAttribute("data-v");if(v)setPT(v)});
 ["s","e","pm","pu"].forEach(function(i){$(i).addEventListener("input",prev)});
@@ -234,7 +239,7 @@ function toast(t,ms){var m=$("msg");m.textContent=t;m.hidden=false;clearTimeout(
 $("csv").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;var rd=new FileReader();
  rd.onload=function(){var n=fromCSV(String(rd.result));
   if(!n.length){toast("Nessuna giornata trovata. Carica il CSV esportato da At Work.");return}
-  var mo={},ck=[];n.forEach(function(r){mo[r[0].slice(0,7)]=1;var g=guessPause(r,IMPN[r[0]]);if(g){r[5]=g[0];r[6]=g[1];r[10]=g[2];if(g[3])ck.push(r[0].slice(8)+"/"+r[0].slice(5,7))}});
+  var mo={},ck=[];n.forEach(function(r){mo[r[0].slice(0,7)]=1;var g=guessPause(r,IMPN[r[0]]);if(g){r[5]=g[0];r[6]=g[1];r[10]=g[2];if(g[3])ck.push(r[0].slice(8)+"/"+r[0].slice(5,7))}if(IMPN[r[0]])IMPN[r[0]]=stdNote(r,IMPN[r[0]])});
   function keep(r){return!mo[r[0].slice(0,7)]}
   BASE=BASE.filter(keep).concat(n);extra=extra.filter(keep);
   Object.keys(notes).forEach(function(k){if(mo[k.slice(0,7)])delete notes[k]});Object.keys(IMPN).forEach(function(k){notes[k]=IMPN[k]});
@@ -247,7 +252,7 @@ function pdf(){
  var J=window.jspdf&&window.jspdf.jsPDF;if(!J){toast("Il generatore PDF non si è caricato. Serve internet, riprova.");return}
  var doc=new J({unit:"mm",format:"a4"}),W=210,M=12,all=window.CUR||[],T=totals(all),rows=[];
  all.forEach(function(o){var r=o.r,k=info(o),t=times(r);
-  var pm2=pmin(r),pzl=r[5]==="both"?[fmin(pm2[0])+" pag.","+ "+fmin(pm2[1])+" mia"]:[ptxt(r,true)];
+  var pm2=pmin(r),pzl=r[5]==="both"?[fminL(pm2[0])+" pagata","+ "+fminL(pm2[1])+" non pagata"]:[ptxt(r)];
   rows.push({pzl:pzl,g:GG[k.w].slice(0,3)+" "+("0"+k.d.getDate()).slice(-2)+"/"+("0"+(k.d.getMonth()+1)).slice(-2)+(r[9]?" F":""),en:t[0],us:t[1],pz:ptxt(r,true),h:r[1],ot:k.ot,sp:r[2],lu:r[7],rb:r[8],n:notes[r[0]]||""})});
  doc.setFillColor(18,17,16);doc.rect(0,0,W,50,"F");
  doc.addImage(document.querySelector(".top img").src,"PNG",M,10,26,26);
@@ -264,31 +269,34 @@ function pdf(){
   doc.setFont("times","bold");doc.setFontSize(19);doc.text(it[0],x+bw/2,68,{align:"center"});
   doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(dk?207:111,dk?198:104,dk?176:91);doc.text(it[1],x+bw/2,75,{align:"center"})});
  /* colonne: Giorno | Entrata | Uscita | Pausa | Ore | Straord. | Pranzo | Luogo | Note */
- var y=90,CX=[M,33,46,59,79,91,104,124,146,W-M];
+ var y=90,CX=[M,31,43,55,84,95,108,127,146,W-M];
  function vl(y1,y2){doc.setDrawColor(170,158,130);doc.setLineWidth(.25);CX.forEach(function(x){doc.line(x,y1,x,y2)})}
  function head(){doc.setFont("helvetica","bold");doc.setFontSize(7.5);doc.setTextColor(111,104,91);
-  doc.text("Giorno",M+1,y);doc.text("Entrata",34,y);doc.text("Uscita",47,y);doc.text("Pausa",60,y);doc.text("Ore",90,y,{align:"right"});doc.text("Straord.",103,y,{align:"right"});doc.text("Pranzo",123,y,{align:"right"});doc.text("Luogo",125,y);doc.text("Note",147,y);
+  doc.text("Giorno",M+1,y);doc.text("Entrata",32,y);doc.text("Uscita",44,y);doc.text("Pausa",56,y);doc.text("Ore",94,y,{align:"right"});doc.text("Straord.",107,y,{align:"right"});doc.text("Pranzo",126,y,{align:"right"});doc.text("Luogo",128,y);doc.text("Note",147,y);
   doc.setDrawColor(195,154,69);doc.setLineWidth(.5);doc.line(M,y+2,W-M,y+2);doc.line(M,y-4,W-M,y-4);vl(y-4,y+2);y+=2}
  head();
  rows.forEach(function(r){doc.setFont("helvetica","normal");doc.setFontSize(8.5);
-  var ln=doc.splitTextToSize(r.n,48),lu=doc.splitTextToSize(r.lu||"",20),rh=Math.max(r.sp||r.pzl.length>1?10:8,ln.length*3.8+4,lu.length*3.8+4);
+  var ln=doc.splitTextToSize(r.n,49),lu=doc.splitTextToSize(r.lu||"",17);doc.setFontSize(7.5);var pz=[];r.pzl.forEach(function(t){pz=pz.concat(doc.splitTextToSize(t,27))});doc.setFontSize(8.5);var rh=Math.max(r.sp?10:8,ln.length*3.8+4,lu.length*3.8+4,pz.length*3.3+4.5);
   if(y+rh>282){doc.addPage();y=20;head()}
   doc.setTextColor(28,27,25);doc.setFont("helvetica","bold");doc.text(r.g,M+1,y+5.5);doc.setFont("helvetica","normal");
-  doc.text(r.en,34,y+5.5);doc.text(r.us,47,y+5.5);doc.setFontSize(7.5);doc.text(r.pzl,60,y+5.5);doc.setFontSize(8.5);doc.text(nf(r.h),90,y+5.5,{align:"right"});
-  if(r.ot){doc.setFont("helvetica","bold");doc.setTextColor(138,100,32);doc.text("+"+nf(r.ot),103,y+5.5,{align:"right"});doc.setFont("helvetica","normal");doc.setTextColor(28,27,25)}
-  else{doc.setTextColor(150,144,132);doc.text("-",103,y+5.5,{align:"right"});doc.setTextColor(28,27,25)}
-  if(r.sp){doc.text(eur(r.sp),123,y+5.5,{align:"right"});doc.setFontSize(6.5);if(r.rb)doc.setTextColor(47,107,58);else doc.setTextColor(161,53,43);doc.text(r.rb?"rimborsato":"da rimborsare",123,y+8.6,{align:"right"});doc.setTextColor(28,27,25);doc.setFontSize(8.5)}
-  else{doc.setTextColor(150,144,132);doc.text("-",123,y+5.5,{align:"right"});doc.setTextColor(28,27,25)}
-  if(lu.length&&lu[0])doc.text(lu,125,y+5.5);
+  doc.text(r.en,32,y+5.5);doc.text(r.us,44,y+5.5);doc.setFontSize(7.5);doc.text(pz,56,y+5.2,{lineHeightFactor:1.25});doc.setFontSize(8.5);doc.text(nf(r.h),94,y+5.5,{align:"right"});
+  if(r.ot){doc.setFont("helvetica","bold");doc.setTextColor(138,100,32);doc.text("+"+nf(r.ot),107,y+5.5,{align:"right"});doc.setFont("helvetica","normal");doc.setTextColor(28,27,25)}
+  else{doc.setTextColor(150,144,132);doc.text("-",107,y+5.5,{align:"right"});doc.setTextColor(28,27,25)}
+  if(r.sp){doc.text(eur(r.sp),126,y+5.5,{align:"right"});doc.setFontSize(6.5);if(r.rb)doc.setTextColor(47,107,58);else doc.setTextColor(161,53,43);doc.text(r.rb?"rimborsato":"da rimborsare",126,y+8.6,{align:"right"});doc.setTextColor(28,27,25);doc.setFontSize(8.5)}
+  else{doc.setTextColor(150,144,132);doc.text("-",126,y+5.5,{align:"right"});doc.setTextColor(28,27,25)}
+  if(lu.length&&lu[0])doc.text(lu,128,y+5.5);
   if(ln.length&&ln[0]){doc.setFontSize(8);doc.text(ln,147,y+5.5)}
   doc.setDrawColor(170,158,130);doc.setLineWidth(.25);doc.line(M,y+rh,W-M,y+rh);vl(y,y+rh);y+=rh});
  if(y>270){doc.addPage();y=20}
- doc.setDrawColor(195,154,69);doc.setLineWidth(.6);doc.line(M,y+2,W-M,y+2);doc.line(M,y+13,W-M,y+13);vl(y+2,y+13);
- doc.setFont("helvetica","bold");doc.setFontSize(9.5);doc.setTextColor(28,27,25);doc.text("Totale",M+1,y+9);doc.text(nf(T.H),90,y+9,{align:"right"});doc.setTextColor(138,100,32);doc.text("+"+nf(T.O),103,y+9,{align:"right"});doc.setTextColor(28,27,25);doc.text(eur(T.S),123,y+9,{align:"right"});
- y+=20;
+ doc.setDrawColor(195,154,69);doc.setLineWidth(.6);doc.line(M,y+2,W-M,y+2);doc.line(M,y+17,W-M,y+17);vl(y+2,y+17);
+ doc.setFont("helvetica","bold");doc.setFontSize(9.5);doc.setTextColor(28,27,25);doc.text("Totale",M+1,y+9);doc.text(nf(T.H),94,y+9,{align:"right"});doc.setTextColor(138,100,32);doc.text("+"+nf(T.O),107,y+9,{align:"right"});doc.setTextColor(28,27,25);doc.text(eur(T.S),126,y+9,{align:"right"});
+ doc.setFont("helvetica","normal");doc.setFontSize(6.3);doc.setTextColor(111,104,91);doc.text("ore",94,y+13.5,{align:"right"});doc.text("lavorate",94,y+16,{align:"right"});doc.text("straordi-",107,y+13.5,{align:"right"});doc.text("nario",107,y+16,{align:"right"});doc.text("pranzi",126,y+13.5,{align:"right"});doc.text("("+eur(T.SR)+" da rimb.)",128,y+9);
+ y+=24;
  /* Riepilogo */
- var lines=[["Orario totale",nf(T.SV)+" ore"],["Pausa non pagata da togliere","− "+nf(r2(T.mu/60))+" ore"],["= ORE LAVORATE",nf(T.SV)+" − "+nf(r2(T.mu/60))+" = "+nf(T.H)+" ore",1],["di cui ore ordinarie",nf(T.ORD)+" ore"],["Ore di straordinario",nf(T.O)+" ore"],["Straordinario con maggiorazione "+nf(CONF.magg)+"%",nf(T.O)+" × "+nf(1+CONF.magg/100)+" = "+nf(T.OM)+" ore"],["TOTALE ORE CON MAGGIORAZIONE",nf(T.ORD)+" + "+nf(T.OM)+" = "+nf(T.TOT)+" ore",1],["Ore del contratto nel mese",nf(CONF.ore)+" ore"],["Differenza",(T.DIFF>0?"+":"")+nf(T.DIFF)+" ore "+(T.DIFF>0.004?"(sopra il contratto)":T.DIFF<-0.004?"(sotto il contratto)":"(pari)")],["Totale pausa pagata (resta dentro le ore)",(fmin(T.mp)||"0")]];var DI=lines.length-2;
- var bh=10+lines.length*7+26;
+ var lines=[["Ore dall'entrata all'uscita",nf(T.SV)+" ore"],["Pausa non pagata da togliere","- "+nf(r2(T.mu/60))+" ore"],["= ORE LAVORATE",nf(T.SV)+" - "+nf(r2(T.mu/60))+" = "+nf(T.H)+" ore",1],["di cui ore ordinarie",nf(T.ORD)+" ore"],["Ore di straordinario",nf(T.O)+" ore"],["Straordinario con maggiorazione "+nf(CONF.magg)+"%",nf(T.O)+" × "+nf(1+CONF.magg/100)+" = "+nf(T.OM)+" ore"],["TOTALE ORE CON MAGGIORAZIONE",nf(T.ORD)+" + "+nf(T.OM)+" = "+nf(T.TOT)+" ore",1],["Ore del contratto nel mese",nf(CONF.ore)+" ore"],["Differenza",(T.DIFF>0?"+":"")+nf(T.DIFF)+" ore "+(T.DIFF>0.004?"(sopra il contratto)":T.DIFF<-0.004?"(sotto il contratto)":"(pari)")],["Totale pausa pagata (resta dentro le ore)",fminL(T.mp)]];var DI=lines.length-2;
+ doc.setFont("helvetica","normal");doc.setFontSize(8.5);var IW=W-2*M-12,pl=doc.splitTextToSize("Pause: "+T.pag+" pagate, "+T.non+" non pagate, "+T.both+" pagata + non pagata, "+T.no+" senza pausa"+(T.nd?", "+T.nd+" non indicate":"")+". Totale pausa pagata "+fminL(T.mp)+", non pagata "+fminL(T.mu)+".",IW).concat(doc.splitTextToSize("Pranzi: "+eur(T.S)+", da rimborsare "+eur(T.SR)+".",IW));doc.setFontSize(7.5);
+ var FN="Straordinario: ore oltre le 8 (lun-gio) e le 7 (ven); sabato, domenica e festivi (F) sono tutte straordinario. Maggiorazione "+nf(CONF.magg)+"% come da CCNL Cooperative e consorzi agricoli (CNEL A016). La pausa non pagata è già tolta dalle ore; la pausa pagata resta dentro.",fl=doc.splitTextToSize(FN,IW);
+ var bh=14+lines.length*7+pl.length*4.2+3+fl.length*3.4+6;
  if(y+bh>287){doc.addPage();y=20}
  doc.setFillColor(250,246,236);doc.setDrawColor(195,154,69);doc.setLineWidth(.6);doc.roundedRect(M,y,W-2*M,bh,3,3,"FD");
  doc.setFont("times","bold");doc.setFontSize(16);doc.setTextColor(138,100,32);doc.text("Riepilogo del mese",M+6,y+9);
@@ -296,9 +304,9 @@ function pdf(){
   if(i===DI)doc.setTextColor(T.DIFF>0.004?47:T.DIFF<-0.004?161:138,T.DIFF>0.004?107:T.DIFF<-0.004?53:100,T.DIFF>0.004?58:T.DIFF<-0.004?43:32);else if(hl)doc.setTextColor(138,100,32);else doc.setTextColor(40,37,32);
   doc.text(l[0],M+6,yy);doc.text(l[1],W-M-6,yy,{align:"right"});if(l[2]){doc.setDrawColor(221,208,184);doc.setLineWidth(.2);doc.line(M+6,yy+2.5,W-M-6,yy+2.5)}yy+=7});
  doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(70,65,56);
- doc.text("Pause: "+T.pag+" pagate, "+T.non+" mie, "+T.both+" pagata+mia, "+T.no+" senza"+(T.nd?", "+T.nd+" non indicate":"")+" (pagate "+(fmin(T.mp)||"0")+", mie "+(fmin(T.mu)||"0")+").   Pranzi: "+eur(T.S)+", da rimborsare "+eur(T.SR)+".",M+6,yy+1);
+ doc.text(pl,M+6,yy+1,{lineHeightFactor:1.4});yy+=pl.length*4.2;
  doc.setFontSize(7.5);doc.setTextColor(111,104,91);
- doc.text(doc.splitTextToSize("Straordinario: ore oltre le 8 (lun-gio) e le 7 (ven); sabato, domenica e festivi (F) sono tutte straordinario. Maggiorazione "+nf(CONF.magg)+"% come da CCNL Cooperative e consorzi agricoli (CNEL A016). La pausa mia (non pagata) è già tolta dalle ore; la pausa pagata resta dentro.",W-2*M-12),M+6,yy+7);
+ doc.text(fl,M+6,yy+3,{lineHeightFactor:1.3});
  var fn="Salumi-Sei-Colli-"+$("mese").textContent.replace(/ /g,"-")+"-Wajdi.pdf";
  var u=(window.claude&&window.claude.use)?Promise.resolve(window.claude.use("downloads")).catch(function(){return null}):Promise.resolve(null);
  u.then(function(dl){if(!dl){var bl=doc.output("blob"),ur=URL.createObjectURL(bl),an=document.createElement("a");an.href=ur;an.download=fn;document.body.appendChild(an);an.click();setTimeout(function(){an.remove();URL.revokeObjectURL(ur)},4000);toast("PDF pronto.");return}
